@@ -1,4 +1,4 @@
-# Here we are going to develop a spring boot microservice based application.
+# Here we are going to develop a spring boot microservice application.
 
 Here is the attached architecture that we are going to implement.
 ![Screenshot (518)](https://github.com/nitinraj2001/java-microservices/assets/72197622/01b790d3-d20e-40d3-97c4-585375595d21)
