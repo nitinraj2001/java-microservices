@@ -1,5 +1,6 @@
 package com.nitin.orderservice.service;
 
+import com.nitin.orderservice.dto.InventoryResponse;
 import com.nitin.orderservice.dto.OrderLineItemsDto;
 import com.nitin.orderservice.dto.OrderRequest;
 import com.nitin.orderservice.entity.Order;
@@ -9,7 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -21,12 +25,28 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
+    private final WebClient webClient;
+
     public void placedOrder(OrderRequest orderRequest){
         Order order=new Order();
         order.setOrderNumber(UUID.randomUUID().toString());
         order.setOrderLineItemsList(orderRequest.getOrderLineItemsDtoList().stream().map(this::mapToDto).collect(Collectors.toList()));
-        orderRepository.save(order);
-        log.info("order {} is saved successfully",order.getOrderNumber());
+
+        //fetch all skuCodes from order line Numbers
+        List<String> skuCodes=order.getOrderLineItemsList().stream().map(orderLineItems -> orderLineItems.getSkuCode()).collect(Collectors.toList());
+        //before placing order it call inventory service to check whether product is in stock or not
+        InventoryResponse[] inventoryResponses = webClient.get().uri("http://localhost:9092/api/inventory", uriBuilder -> uriBuilder.queryParam("skuCode",skuCodes).build())
+                        .retrieve().bodyToMono(InventoryResponse[].class).block();
+        //Determine whether all products are in stocks or not
+        boolean allInStock=Arrays.stream(inventoryResponses).allMatch(inventoryResponse -> inventoryResponse.isInStock());
+        if(allInStock){
+            orderRepository.save(order);
+        }
+        else{
+            throw new IllegalArgumentException("Product is not in stock pls try again later!");
+        }
+
+        //log.info("order {} is saved successfully",order.getOrderNumber());
     }
 
     private OrderLineItems mapToDto(OrderLineItemsDto orderLineItemsDto) {
