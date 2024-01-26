@@ -5,9 +5,11 @@ import com.nitin.orderservice.dto.OrderLineItemsDto;
 import com.nitin.orderservice.dto.OrderRequest;
 import com.nitin.orderservice.entity.Order;
 import com.nitin.orderservice.entity.OrderLineItems;
+import com.nitin.orderservice.event.OrderPlacedEvent;
 import com.nitin.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -27,6 +29,8 @@ public class OrderService {
 
     private final WebClient.Builder webClientBuilder;
 
+    private final KafkaTemplate<String,OrderPlacedEvent> kafkaTemplate;
+
     public String placedOrder(OrderRequest orderRequest){
         Order order=new Order();
         order.setOrderNumber(UUID.randomUUID().toString());
@@ -41,6 +45,7 @@ public class OrderService {
         boolean allInStock=Arrays.stream(inventoryResponses).allMatch(inventoryResponse -> inventoryResponse.isInStock());
         if(allInStock){
             orderRepository.save(order);
+            kafkaTemplate.send("notificationTopic",new OrderPlacedEvent(order.getOrderNumber()));
             return "Order is placed successfully";
         }
         else{
